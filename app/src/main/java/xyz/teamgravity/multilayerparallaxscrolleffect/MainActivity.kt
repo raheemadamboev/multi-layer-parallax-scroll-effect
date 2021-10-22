@@ -1,5 +1,6 @@
 package xyz.teamgravity.multilayerparallaxscrolleffect
 
+import android.content.res.Resources
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,8 +17,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
@@ -39,8 +45,32 @@ class MainActivity : ComponentActivity() {
             val imageHeight = (LocalConfiguration.current.screenWidthDp * (2f / 3f)).dp
             val lazyListState = rememberLazyListState()
 
+            val nestedScrollConnection = remember {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                        val delta = available.y
+
+                        // check if first item or last
+                        if (lazyListState.firstVisibleItemIndex == 0) {
+                            return Offset.Zero
+                        }
+
+                        val layoutInfo = lazyListState.layoutInfo
+                        if (layoutInfo.visibleItemsInfo.lastOrNull()?.index == layoutInfo.totalItemsCount - 1) {
+                            return Offset.Zero
+                        }
+
+                        moonOffset += delta * moonScrollSpeed
+                        midOffset += delta * midScrollSpeed
+                        return Offset.Zero
+                    }
+                }
+            }
+
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(nestedScrollConnection),
                 state = lazyListState
             ) {
                 items(10) {
@@ -57,7 +87,7 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .clipToBounds()
                             .fillMaxWidth()
-                            .height(imageHeight)
+                            .height(imageHeight + midOffset.toDp())
                             .background(Brush.verticalGradient(listOf(Color(0xFFf36b21), Color(0xFFf9a521))))
                     ) {
                         Image(
@@ -65,7 +95,11 @@ class MainActivity : ComponentActivity() {
                             contentDescription = "moon",
                             contentScale = ContentScale.FillWidth,
                             alignment = Alignment.BottomCenter,
-                            modifier = Modifier.matchParentSize()
+                            modifier = Modifier
+                                .matchParentSize()
+                                .graphicsLayer {
+                                    translationY = moonOffset
+                                }
                         )
 
                         Image(
@@ -73,7 +107,11 @@ class MainActivity : ComponentActivity() {
                             contentDescription = "mid",
                             contentScale = ContentScale.FillWidth,
                             alignment = Alignment.BottomCenter,
-                            modifier = Modifier.matchParentSize()
+                            modifier = Modifier
+                                .matchParentSize()
+                                .graphicsLayer {
+                                    translationY = midOffset
+                                }
                         )
 
                         Image(
@@ -97,4 +135,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    private fun Float.toDp() = (this / Resources.getSystem().displayMetrics.density).dp
 }
